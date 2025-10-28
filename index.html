@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NM Induction Log</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0b5ed7"/>
+  <style>
+    :root { --bg:#f7f7f7; --primary:#0b5ed7; --text:#111; --muted:#666; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--text); }
+    header { background:var(--primary); color:#fff; padding:16px 20px; position:sticky; top:0; }
+    h1 { margin:0; font-size:20px; }
+    main { max-width:720px; margin:0 auto; padding:16px; }
+    .card { background:#fff; border-radius:14px; box-shadow:0 6px 24px rgba(0,0,0,.06); padding:16px; }
+    label { display:block; font-weight:600; margin:6px 0; }
+    input { width:100%; padding:12px; border:1px solid #ddd; border-radius:10px; font-size:16px; }
+    button { width:100%; padding:12px; margin-top:12px; border:none; border-radius:10px; background:var(--primary); color:#fff; font-weight:600; font-size:16px; }
+    button:disabled { opacity:.7; }
+    .muted { color:var(--muted); font-size:12px; margin-top:8px; }
+    .result { margin-top:16px; }
+    table { width:100%; border-collapse:collapse; font-size:15px; }
+    td { padding:10px 6px; border-bottom:1px solid #eee; vertical-align:top; }
+    td:first-child { width:45%; font-weight:600; color:#333; }
+    .not-found { color:#b00020; font-weight:700; margin-top:8px; }
+    .chip { display:inline-block; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700; }
+    .chip.ok { background:#e7f7ec; color:#127a3a; }
+    .chip.no { background:#fde7ea; color:#a5122a; }
+    .top-status { display:flex; gap:8px; margin:8px 0 12px; flex-wrap:wrap; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>NM Induction Log</h1>
+  </header>
+  <main>
+    <div class="card">
+      <label for="q">EMP # / Iqama #</label>
+      <input id="q" inputmode="numeric" placeholder="e.g. 2461372647" autocomplete="off" />
+      <button id="go">Search</button>
+      <div id="msg" class="muted">Only the required fields are shown.</div>
+      <div id="res" class="result"></div>
+    </div>
+  </main>
+
+  <script src="config.js"></script>
+  <script>
+    // Optional fallback: if config.js didn’t load, define API_URL here
+    window.API_URL = window.API_URL || "https://script.google.com/macros/s/YOUR_EXEC_URL/exec";
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js');
+    }
+
+    const btn  = document.getElementById('go');
+    const input= document.getElementById('q');
+    const res  = document.getElementById('res');
+    const msg  = document.getElementById('msg');
+
+    function search() {
+      const q = (input.value || '').trim();
+      res.innerHTML = "";
+      if (!q) { msg.textContent = "Enter EMP # / Iqama #"; return; }
+      btn.disabled = true; msg.textContent = "Searching...";
+
+      // Create a unique callback name for this request
+      const cb = "cb_" + Date.now() + "_" + Math.floor(Math.random()*1e6);
+
+      // Define the global callback the server will call
+      window[cb] = (data) => {
+        try {
+          if (!data || !data.found) {
+            res.innerHTML = '<div class="not-found">No induction record found.</div>';
+            msg.textContent = "Not found";
+            return;
+          }
+          const w = data.worker || {};
+          const pledge = (w["Defensive Driving Briefing and Pledge"] || "").toLowerCase() === "yes";
+          const water  = (w["Water Flask availability"] || "").toLowerCase() === "yes";
+
+          let html = `
+            <div class="top-status">
+              <span class="chip ${w["Date of Induction"] ? 'ok' : 'no'}">${w["Date of Induction"] ? 'Inducted' : 'Not Inducted'}</span>
+              <span class="chip ${pledge ? 'ok' : 'no'}">Defensive Driving</span>
+              <span class="chip ${water ? 'ok' : 'no'}">Water Flask</span>
+            </div>
+            <table>
+              <tr><td>EMP # / Iqama #</td><td>${w["EMP # / Iqama #"] || ""}</td></tr>
+              <tr><td>Employee Name</td><td>${w["Employee Name"] || ""}</td></tr>
+              <tr><td>Designation / Job</td><td>${w["Designation / Job"] || ""}</td></tr>
+              <tr><td>Company</td><td>${w["Company"] || ""}</td></tr>
+              <tr><td>Date of Induction</td><td>${w["Date of Induction"] || ""}</td></tr>
+              <tr><td>Inducted by</td><td>${w["Inducted by"] || ""}</td></tr>
+              <tr><td>Project</td><td>${w["Project"] || ""}</td></tr>
+              <tr><td>Defensive Driving Briefing and Pledge</td><td>${w["Defensive Driving Briefing and Pledge"] || ""}</td></tr>
+              <tr><td>Water Flask availability</td><td>${w["Water Flask availability"] || ""}</td></tr>
+              <tr><td>Medical Screening Status</td><td>${w["Medical Screening Status"] || ""}</td></tr>
+            </table>
+          `;
+          res.innerHTML = html;
+          msg.textContent = "Done";
+        } finally {
+          // Cleanup: remove script + callback and re-enable button
+          delete window[cb];
+          if (script && script.parentNode) script.parentNode.removeChild(script);
+          btn.disabled = false;
+        }
+      };
+
+      // Create a <script> tag to load JSONP response from Apps Script
+      const script = document.createElement('script');
+      script.src = window.API_URL + "?q=" + encodeURIComponent(q) + "&callback=" + cb;
+      script.onerror = () => {
+        res.innerHTML = '<div class="not-found">Error: Failed to reach API</div>';
+        msg.textContent = "Error";
+        delete window[cb];
+        btn.disabled = false;
+      };
+      document.body.appendChild(script);
+    }
+
+    btn.addEventListener('click', search);
+    input.addEventListener('keyup', (e) => { if (e.key === 'Enter') search(); });
+  </script>
+
+
+</body>
+</html>
