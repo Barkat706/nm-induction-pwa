@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>NM Induction Log</title>
@@ -33,7 +32,7 @@
 </head>
 <body>
   <header>
-    <h1>NM Induction Log</h1>
+    <h1>SAJCO Induction Log - NM</h1>
   </header>
   <main>
     <div class="card">
@@ -47,8 +46,8 @@
 
   <script src="config.js"></script>
   <script>
-    // Optional fallback: if config.js didn’t load, define API_URL here
-    window.API_URL = window.API_URL || "https://script.google.com/macros/s/YOUR_EXEC_URL/exec";
+    // Optional fallback if config.js didn’t load:
+    window.API_URL = window.API_URL || "https://script.google.com/macros/s/YOUR_EXEC_ID/exec";
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('service-worker.js');
@@ -65,10 +64,7 @@
       if (!q) { msg.textContent = "Enter EMP # / Iqama #"; return; }
       btn.disabled = true; msg.textContent = "Searching...";
 
-      // Create a unique callback name for this request
       const cb = "cb_" + Date.now() + "_" + Math.floor(Math.random()*1e6);
-
-      // Define the global callback the server will call
       window[cb] = (data) => {
         try {
           if (!data || !data.found) {
@@ -80,7 +76,7 @@
           const pledge = (w["Defensive Driving Briefing and Pledge"] || "").toLowerCase() === "yes";
           const water  = (w["Water Flask availability"] || "").toLowerCase() === "yes";
 
-          let html = `
+          res.innerHTML = `
             <div class="top-status">
               <span class="chip ${w["Date of Induction"] ? 'ok' : 'no'}">${w["Date of Induction"] ? 'Inducted' : 'Not Inducted'}</span>
               <span class="chip ${pledge ? 'ok' : 'no'}">Defensive Driving</span>
@@ -99,17 +95,14 @@
               <tr><td>Medical Screening Status</td><td>${w["Medical Screening Status"] || ""}</td></tr>
             </table>
           `;
-          res.innerHTML = html;
           msg.textContent = "Done";
         } finally {
-          // Cleanup: remove script + callback and re-enable button
           delete window[cb];
           if (script && script.parentNode) script.parentNode.removeChild(script);
           btn.disabled = false;
         }
       };
 
-      // Create a <script> tag to load JSONP response from Apps Script
       const script = document.createElement('script');
       script.src = window.API_URL + "?q=" + encodeURIComponent(q) + "&callback=" + cb;
       script.onerror = () => {
@@ -124,6 +117,7 @@
     btn.addEventListener('click', search);
     input.addEventListener('keyup', (e) => { if (e.key === 'Enter') search(); });
   </script>
+
 
 
 </body>
