@@ -44,79 +44,88 @@
     </div>
   </main>
 
-  <script src="config.js"></script>
-  <script>
-    // Optional fallback if config.js didn’t load:
-    window.API_URL = window.API_URL || "https://script.google.com/macros/s/AKfycbxCRxdauakVUvMeiZfzwBUeAQi0byA53HoVs6ukqXdUMvfH6whNxGtjT42O2arYRY8w/exec";
+<script src="config.js"></script>
+<script>
+  // 1) See what URL we have from config.js
+  console.log("API_URL from config.js =", window.API_URL);
 
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-workerv2.js');
-    }
+  // 2) Fallback (PUT YOUR REAL /exec HERE so it always has a value)
+  window.API_URL = window.API_URL || "https://script.google.com/macros/s/PASTE_YOUR_EXEC_ID_HERE/exec";
 
-    const btn  = document.getElementById('go');
-    const input= document.getElementById('q');
-    const res  = document.getElementById('res');
-    const msg  = document.getElementById('msg');
+  // 3) Disable SW while debugging (avoid cached old JS)
+  // if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-workerv2.js');
 
-    function search() {
-      const q = (input.value || '').trim();
-      res.innerHTML = "";
-      if (!q) { msg.textContent = "Enter EMP # / Iqama #"; return; }
-      btn.disabled = true; msg.textContent = "Searching...";
+  const btn  = document.getElementById('go');
+  const input= document.getElementById('q');
+  const res  = document.getElementById('res');
+  const msg  = document.getElementById('msg');
 
-      const cb = "cb_" + Date.now() + "_" + Math.floor(Math.random()*1e6);
-      window[cb] = (data) => {
-        try {
-          if (!data || !data.found) {
-            res.innerHTML = '<div class="not-found">No induction record found.</div>';
-            msg.textContent = "Not found";
-            return;
-          }
-          const w = data.worker || {};
-          const pledge = (w["Defensive Driving Briefing and Pledge"] || "").toLowerCase() === "yes";
-          const water  = (w["Water Flask availability"] || "").toLowerCase() === "yes";
+  function search() {
+    const q = (input.value || '').trim();
+    res.innerHTML = "";
+    if (!q) { msg.textContent = "Enter EMP # / Iqama #"; return; }
+    btn.disabled = true; msg.textContent = "Searching...";
 
-          res.innerHTML = `
-            <div class="top-status">
-              <span class="chip ${w["Date of Induction"] ? 'ok' : 'no'}">${w["Date of Induction"] ? 'Inducted' : 'Not Inducted'}</span>
-              <span class="chip ${pledge ? 'ok' : 'no'}">Defensive Driving</span>
-              <span class="chip ${water ? 'ok' : 'no'}">Water Flask</span>
-            </div>
-            <table>
-              <tr><td>EMP # / Iqama #</td><td>${w["EMP # / Iqama #"] || ""}</td></tr>
-              <tr><td>Employee Name</td><td>${w["Employee Name"] || ""}</td></tr>
-              <tr><td>Designation / Job</td><td>${w["Designation / Job"] || ""}</td></tr>
-              <tr><td>Company</td><td>${w["Company"] || ""}</td></tr>
-              <tr><td>Date of Induction</td><td>${w["Date of Induction"] || ""}</td></tr>
-              <tr><td>Inducted by</td><td>${w["Inducted by"] || ""}</td></tr>
-              <tr><td>Project</td><td>${w["Project"] || ""}</td></tr>
-              <tr><td>Defensive Driving Briefing and Pledge</td><td>${w["Defensive Driving Briefing and Pledge"] || ""}</td></tr>
-              <tr><td>Water Flask availability</td><td>${w["Water Flask availability"] || ""}</td></tr>
-              <tr><td>Medical Screening Status</td><td>${w["Medical Screening Status"] || ""}</td></tr>
-            </table>
-          `;
-          msg.textContent = "Done";
-        } finally {
-          delete window[cb];
-          if (script && script.parentNode) script.parentNode.removeChild(script);
-          btn.disabled = false;
+    const cb = "cb_" + Date.now() + "_" + Math.floor(Math.random()*1e6);
+    const src = window.API_URL + "?q=" + encodeURIComponent(q) + "&callback=" + cb;
+    console.log("JSONP request:", src);
+
+    window[cb] = (data) => {
+      try {
+        console.log("JSONP response:", data);
+        if (!data || !data.found) {
+          res.innerHTML = '<div class="not-found">No induction record found.</div>';
+          msg.textContent = "Not found";
+          return;
         }
-      };
+        const w = data.worker || {};
+        const pledge = (w["Defensive Driving Briefing and Pledge"] || "").toLowerCase();
+        const pledgeOk = pledge === "yes" || pledge === "conducted";
+        const waterOk  = (w["Water Flask availability"] || "").toLowerCase() === "yes";
 
-      const script = document.createElement('script');
-      script.src = window.API_URL + "?q=" + encodeURIComponent(q) + "&callback=" + cb;
-      script.onerror = () => {
-        res.innerHTML = '<div class="not-found">Error: Failed to reach API</div>';
-        msg.textContent = "Error";
+        res.innerHTML = `
+          <div class="top-status">
+            <span class="chip ${w["Date of Induction"] ? 'ok' : 'no'}">${w["Date of Induction"] ? 'Inducted' : 'Not Inducted'}</span>
+            <span class="chip ${pledgeOk ? 'ok' : 'no'}">Defensive Driving</span>
+            <span class="chip ${waterOk ? 'ok' : 'no'}">Water Flask</span>
+          </div>
+          <table>
+            <tr><td>EMP # / Iqama #</td><td>${w["EMP # / Iqama #"] ?? ""}</td></tr>
+            <tr><td>Employee Name</td><td>${w["Employee Name"] ?? ""}</td></tr>
+            <tr><td>Designation / Job</td><td>${w["Designation / Job"] ?? ""}</td></tr>
+            <tr><td>Company</td><td>${w["Company"] ?? ""}</td></tr>
+            <tr><td>Date of Induction</td><td>${w["Date of Induction"] ?? ""}</td></tr>
+            <tr><td>Inducted by</td><td>${w["Inducted by"] ?? ""}</td></tr>
+            <tr><td>Project</td><td>${w["Project"] ?? ""}</td></tr>
+            <tr><td>Defensive Driving Briefing and Pledge</td><td>${w["Defensive Driving Briefing and Pledge"] ?? ""}</td></tr>
+            <tr><td>Water Flask availability</td><td>${w["Water Flask availability"] ?? ""}</td></tr>
+            <tr><td>Medical Screening Status</td><td>${w["Medical Screening Status"] ?? ""}</td></tr>
+          </table>
+        `;
+        msg.textContent = "Done";
+      } finally {
         delete window[cb];
+        if (script && script.parentNode) script.parentNode.removeChild(script);
         btn.disabled = false;
-      };
-      document.body.appendChild(script);
-    }
+      }
+    };
 
-    btn.addEventListener('click', search);
-    input.addEventListener('keyup', (e) => { if (e.key === 'Enter') search(); });
-  </script>
+    const script = document.createElement('script');
+    script.src = src;
+    script.onerror = () => {
+      console.error("JSONP script failed to load:", src);
+      res.innerHTML = '<div class="not-found">Error: Failed to reach API</div>';
+      msg.textContent = "Error";
+      delete window[cb];
+      btn.disabled = false;
+    };
+    document.body.appendChild(script);
+  }
+
+  btn.addEventListener('click', search);
+  input.addEventListener('keyup', (e) => { if (e.key === 'Enter') search(); });
+</script>
+
 
 
 
